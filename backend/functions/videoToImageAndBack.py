@@ -12,7 +12,9 @@ def convert_video_to_images(video):
         ret, frame = cam.read()
         if not ret:
             break
-        frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+        new_width = int(frame.shape[1] * (2/3))
+        new_height = int(frame.shape[0] * (2/3))
+        frame = cv2.resize(frame, (new_width, new_height))
         frames.append(frame)
     cam.release()
     os.remove(video_path)

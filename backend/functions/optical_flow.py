@@ -34,11 +34,14 @@ def make_background_transparent(image):
     result[:,:,3] = mask
     return result
 
-def making_image(base_image, rotated_optical_flow_image, average_difference, all_images, image_number):
-    matrix = np.float32([[1, 0, -average_difference[0]], [0, 1, -average_difference[1]]])
-    result_image = cv2.warpAffine(rotated_optical_flow_image, matrix, (base_image.shape[1], base_image.shape[0]))
+def making_image(base_image, rotated_optical_flow_image, average_difference, all_images, drone, image_number):
+    new_transformation_matrix = np.array([[1, 0, -average_difference[0]],
+                                          [0, 1, -average_difference[1]],
+                                          [0, 0, 1]])
+    transform_matrix = np.dot(drone.transformation_matrix, new_transformation_matrix)
+    warped_image = cv2.warpAffine(rotated_optical_flow_image, transform_matrix, (base_image.shape[1], base_image.shape[0]))
     # load image
-    transparent_image = make_background_transparent(result_image)
+    transparent_image = make_background_transparent(warped_image)
 
     # Extract the foreground and alpha channels
     foreground_img = transparent_image[:, :, :3]
@@ -59,51 +62,51 @@ def making_image(base_image, rotated_optical_flow_image, average_difference, all
     all_images[image_number] = overlayed_image
 
 
-def optical_flow(base_image, prev_image, overlay_images, drone, image_number, image_array):
-    prev_gray = cv2.cvtColor(prev_image, cv2.COLOR_BGR2GRAY)
+def optical_flow(base_image, overlay_image, drone, image_array, image_number):
+    prev_gray = cv2.cvtColor(drone.prev_image, cv2.COLOR_BGR2GRAY)
     prev_gray = cv2.resize(prev_gray, (int(prev_gray.shape[1] * drone.coeff), int(prev_gray.shape[0] * drone.coeff)))
     # Initialize previous points for optical flow
     prev_pts = cv2.goodFeaturesToTrack(prev_gray, maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7)
-    for i in range(image_number, len(overlay_images)):
-        # Convert current frame to grayscale
-        current_gray = cv2.cvtColor(overlay_images[i], cv2.COLOR_BGR2GRAY)
-        current_gray = cv2.resize(current_gray, (int(current_gray.shape[1] * drone.coeff), int(current_gray.shape[0] * drone.coeff)))
-        current_image = overlay_images[i]
-        current_image = cv2.resize(current_image, (int(current_image.shape[1] * drone.coeff), int(current_image.shape[0] * drone.coeff)))
 
-        rotated_optical_flow_image = imutils.rotate_bound(current_image, -drone.rotation)
-        # Compute optical flow
-        next_pts, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray, current_gray, prev_pts, None)
-
-        # Filter valid points
-        valid_prev_pts = prev_pts[status == 1]
-        valid_next_pts = next_pts[status == 1]
-
-        # Calculate displacement between points
-        displacement = valid_next_pts - valid_prev_pts
-        
-        # Calculate average displacement (shift) in x and y directions
-        shift_x = np.mean(displacement[:, 0])
-        shift_y = np.mean(displacement[:, 1])
-
-        # Convert rotation angle to radians
-        rotation_angle_rad = math.radians(drone.rotation)
-
-        shift_x_rotated = shift_x * math.cos(rotation_angle_rad) + shift_y * math.sin(rotation_angle_rad)
-        shift_y_rotated = -shift_x * math.sin(rotation_angle_rad) + shift_y * math.cos(rotation_angle_rad)
-
-        # Add rotated shift values to original coordinates
-        final_x = drone.average_difference[0] + shift_x_rotated
-        final_y = drone.average_difference[1] + shift_y_rotated
-        
-        drone.average_difference[0] = final_x
-        drone.average_difference[1] = final_y
-
-        # Update previous points for the next iteration
-        prev_pts = valid_next_pts.reshape(-1, 1, 2)
-        making_image(base_image, rotated_optical_flow_image, drone.average_difference, image_array, i)
-
-        # Update previous frame
-        prev_gray = current_gray
+    # Convert current frame to grayscale
+    current_gray = cv2.cvtColor(overlay_image, cv2.COLOR_BGR2GRAY)
+    current_gray = cv2.resize(current_gray, (int(current_gray.shape[1] * drone.coeff), int(current_gray.shape[0] * drone.coeff)))
     
-    return image_array
+    current_image = overlay_image
+    current_image = cv2.resize(current_image, (int(current_image.shape[1] * drone.coeff), int(current_image.shape[0] * drone.coeff)))
+
+    rotated_optical_flow_image = imutils.rotate_bound(current_image, -drone.rotation)
+    # Compute optical flow
+    next_pts, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray, current_gray, prev_pts, None)
+
+    # Filter valid points
+    valid_prev_pts = prev_pts[status == 1]
+    valid_next_pts = next_pts[status == 1]
+
+    # Calculate displacement between points
+    displacement = valid_next_pts - valid_prev_pts
+    
+    # Calculate average displacement (shift) in x and y directions
+    shift_x = np.mean(displacement[:, 0])
+    shift_y = np.mean(displacement[:, 1])
+
+    # Convert rotation angle to radians
+    rotation_angle_rad = math.radians(drone.rotation)
+
+    shift_x_rotated = shift_x * math.cos(rotation_angle_rad) + shift_y * math.sin(rotation_angle_rad)
+    shift_y_rotated = -shift_x * math.sin(rotation_angle_rad) + shift_y * math.cos(rotation_angle_rad)
+
+    # Add rotated shift values to original coordinates
+    drone.average_difference[0] = drone.average_difference[0] + shift_x_rotated
+    drone.average_difference[1] = drone.average_difference[1] + shift_y_rotated
+
+    # Update previous points for the next iteration
+    making_image(base_image, rotated_optical_flow_image, drone.average_difference, image_array, drone, image_number)
+
+    # Update previous frame
+    drone.prev_image = overlay_image
+
+    # if image_number % 50 == 0:
+    #     drone.isWarped = False
+    
+    return image_array, drone

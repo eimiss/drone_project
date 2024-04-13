@@ -1,11 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import playIcon from '../Images/PlayButton.png';
 import pauseIcon from '../Images/PauseButton.png';
 import zoomInIcon from '../Images/ZoomIn.png';
 import zoomOutIcon from '../Images/ZoomOut.png';
+import Header from '../Components/Header';
+import History from '../Pages/History';
+
 
 const VideoWatch = () => {
+    // Navigator
+    const navigate = useNavigate();
     // Get video
     const location = useLocation();
     const videoUrl = location.state.videoPath;
@@ -23,8 +28,6 @@ const VideoWatch = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [offset, setOffset] = useState({ x: 0, y: 0 });
-    // Videos
-    const [videos, setVideos] = useState([]);
 
     // Following mouse inputs
     const handleMouseUp = () => {
@@ -44,6 +47,7 @@ const VideoWatch = () => {
         // Calculate the new offset
         let newOffsetX = offset.x + offsetX;
         let newOffsetY = offset.y + offsetY;
+        console.log(newOffsetX, newOffsetY);
 
         setOffset({
             x: newOffsetX,
@@ -109,23 +113,6 @@ const VideoWatch = () => {
         };
     }, []);
 
-    // Getting all videos from backend
-    useEffect(() => {
-        const fetchVideos = async () => {
-            try {
-                const response = await fetch('http://localhost:5000/app/videos');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch videos');
-                }
-                const data = await response.json();
-                setVideos(data.videos_infos);
-            } catch (error) {
-                console.error(error);
-            }
-        };
-        fetchVideos();
-    }, []);
-
     // Custom video player with zoom
     const stylesVideo = {
         containerVideo: {
@@ -160,6 +147,10 @@ const VideoWatch = () => {
             color: 'white',
             margin: 'auto',
             maxWidth: '1280px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: "10px"
         },
         iconStyle: {
             width: '30px',
@@ -181,13 +172,18 @@ const VideoWatch = () => {
             width: '100%',
             background: '#c2c0c0',
         },
+        fullDiv: {
+            backgroundColor: '#020853',
+        }
     };
 
     return (
-        <div>
+        <div style={stylesVideo.fullDiv}>
+            {/* Header */}
+            <Header />
             {/* Custom video player div with black background */}
             <div style={stylesVideo.blackBorders}>
-            <h1>Custom Video Player</h1>
+                <h1>Custom Video Player</h1>
                 {/* Custom video player with zoom */}
                 <div style={stylesVideo.containerVideo}>
                     <video ref={videoRef} src={videoUrl} style={stylesVideo.video}
@@ -217,23 +213,7 @@ const VideoWatch = () => {
                     <button onClick={zoomIn}><img src={zoomInIcon} alt="Zoom in" style={stylesVideo.iconStyle} /></button>
                     <button onClick={zoomOut}><img src={zoomOutIcon} alt="Zoom out" style={stylesVideo.iconStyle} /></button>
                 </div>
-                <div style={allVideosStyle.divStyle}>
-                <h1>Video list</h1>
-                    {videos.map((video) => (
-                        <div key={video.name} style={allVideosStyle.videoContainer} onMouseOver={(e) => 
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'} onMouseOut={(e) => 
-                        e.currentTarget.style.backgroundColor = 'transparent'}>
-                            <div style={allVideosStyle.thumbnailContainer}>
-                                <img src={`data:image/jpeg;base64, ${video.frame}`} alt="Thumbnail" style={allVideosStyle.thumbnail} />
-                            </div>
-                            <div style={allVideosStyle.videoInfo}>
-                                <h2>{video.name}</h2>
-                                <p>{video.created_date}</p>
-                            </div>
-                            <p style={allVideosStyle.videoDuration}>{video.duration} seconds</p>
-                        </div>
-                    ))}
-                </div>
+                <History />
             </div>
         </div>
     );
@@ -241,45 +221,3 @@ const VideoWatch = () => {
 
 
 export default VideoWatch;
-
-const allVideosStyle = {
-    divStyle: {
-        borderRadius: '10px',
-        backgroundColor: '#01041b',
-        overflow: "hidden",
-        width: "100%",
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        marginTop: "30px"
-    },
-    videoContainer: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        width: "80%",
-        padding: "10px",
-        margin: "5px",
-        cursor: "pointer",
-        border: "2px solid #ccc"
-    },
-    videoInfo: {
-        flex: "1",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start"
-    },
-    videoDuration: {
-        marginLeft: "10px"
-    },
-    thumbnailContainer: {
-        width: "100px",
-        height: "auto",
-        marginRight: "10px"
-    },
-    thumbnail: {
-        width: "100px",
-        height: "100px",
-    }
-}

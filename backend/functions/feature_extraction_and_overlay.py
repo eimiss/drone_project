@@ -6,15 +6,18 @@ import skimage.exposure
 import math
 
 MIN_MATCH_COUNT = 5
-FLANN_INDEX_KDTREE = 0
 
-def similar_features(base_image, overlay_images, image_number):    
+def similar_features(base_image, overlay_image):
+    #Greyscale images
+    gray_base = cv2.cvtColor(base_image, cv2.COLOR_BGR2GRAY)
+    gray_overlay = cv2.cvtColor(overlay_image, cv2.COLOR_BGR2GRAY)
+
     sift = cv2.SIFT_create()
     # find the keypoints and descriptors with SIFT
-    kp1, des1 = sift.detectAndCompute(base_image,None)
-    kp2, des2 = sift.detectAndCompute(overlay_images[image_number],None)
+    kp1, des1 = sift.detectAndCompute(gray_base,None)
+    kp2, des2 = sift.detectAndCompute(gray_overlay,None)
 
-    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+    index_params = dict(algorithm = 0, trees = 5)
     search_params = dict(checks = 50)
 
     flann = cv2.FlannBasedMatcher(index_params, search_params)
@@ -22,11 +25,11 @@ def similar_features(base_image, overlay_images, image_number):
 
     good = []
     for m,n in matches:
-        if m.distance < 0.7*n.distance:
+        if m.distance < 0.80*n.distance:
             good.append(m)
     return good, kp1, kp2
 
-def extracting_features(good, kp1, kp2, overlay_images, image_number, source_points, destination_points):
+def extracting_features(good, kp1, kp2, overlay_image, source_points, destination_points):
     if len(good)>MIN_MATCH_COUNT:
         src_pts = np.float32([ kp1[m.queryIdx].pt for m in good ]).reshape(-1,1,2)
         dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
@@ -38,7 +41,7 @@ def extracting_features(good, kp1, kp2, overlay_images, image_number, source_poi
             degrees = theta
             theta = degrees % 360
         # Rotate image
-        img2_rotated = imutils.rotate_bound(overlay_images[image_number], -theta)
+        img2_rotated = imutils.rotate_bound(overlay_image, -theta)
         matchesMask = mask.ravel().tolist()
         # Filter out outliers (keeping only inliers)
         inlier_matches = [m for i, m in enumerate(good) if matchesMask[i] == 1]
@@ -140,17 +143,31 @@ def make_background_transparent(image):
     result[:,:,3] = mask
     return result
 
-def feature_extraction_and_overlay(base_image, overlay_images, image_number, image_array, drone):
+def warp_image(destination_image, source_image, destination_points, source_points):
+    # Convert points to numpy arrays
+    source_pts = np.array(source_points)
+    dest_pts = np.array(destination_points)
+
+    # Find the transformation matrix using corresponding points
+    transformation_matrix = cv2.estimateAffine2D(dest_pts, source_pts)[0]
+    print(transformation_matrix)
+
+    # Warp the source image using the transformation matrix
+    warped_image = cv2.warpAffine(destination_image, transformation_matrix, (source_image.shape[1], source_image.shape[0]))
+
+    return warped_image, transformation_matrix
+
+def feature_extraction_and_overlay(base_image, overlay_image, image_number, image_array, drone):
     source_points = []
     destination_points = []
     theta = 0
 
-    good, kp1, kp2 = similar_features(base_image, overlay_images, image_number)
+    good, kp1, kp2 = similar_features(base_image, overlay_image)
 
     img2_rotated, theta, source_points, destination_points = extracting_features(good, kp1,
-            kp2, overlay_images, image_number, source_points, destination_points)
+            kp2, overlay_image, source_points, destination_points)
 
-    rotated_points = rotate_points_main(overlay_images[image_number], img2_rotated, destination_points, theta)
+    rotated_points = rotate_points_main(overlay_image, img2_rotated, destination_points, theta)
 
     square_size_source = square_size(source_points)
     square_size_destination = square_size(rotated_points)
@@ -161,10 +178,7 @@ def feature_extraction_and_overlay(base_image, overlay_images, image_number, ima
     img2_resized = cv2.resize(img2_rotated, (int(img2_rotated.shape[1] * coeff), int(img2_rotated.shape[0] * coeff)))
 
     new_rotated_points = resize_points(rotated_points, coeff)
-    average_difference = calculate_average_difference(source_points, new_rotated_points)
-    
-    matrix = np.float32([[1, 0, -average_difference[0]], [0, 1, -average_difference[1]]])
-    result_image = cv2.warpAffine(img2_resized, matrix, (base_image.shape[1], base_image.shape[0]))
+    result_image, transformation_matrix = warp_image(img2_resized, base_image, new_rotated_points, source_points)
 
     # load image
     transparent_image = make_background_transparent(result_image)
@@ -187,8 +201,11 @@ def feature_extraction_and_overlay(base_image, overlay_images, image_number, ima
     image_array[image_number] = overlayed_image
 
     # Adding drone configs
-    drone.average_difference = average_difference
+    drone.average_difference = [0, 0]
     drone.coeff = coeff
     drone.rotation = theta
+    drone.transformation_matrix = transformation_matrix
+    drone.isWarped = True
+    drone.prev_image = overlay_image
         
-    return image_array, overlay_images[image_number], drone
+    return image_array, drone

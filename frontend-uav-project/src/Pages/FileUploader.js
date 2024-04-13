@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Header from '../Components/Header';
 
 const Uploader = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -42,46 +43,51 @@ const Uploader = () => {
 
       const data = await response.json();
       console.log(data);
-      navigate('/videoWatch', {state: {videoPath: data.output_video_path}});
+      navigate('/videoWatch', { state: { videoPath: data.output_video_path } });
     } catch (error) {
       console.error('Error uploading files:', error);
     }
   };
 
   return (
-    <div style={styles.container}>
-    <h2 style={styles.title}>Image Uploader</h2>
-    {selectedImage && (
-      <div style={styles.previewContainer}>
-        <h3 style={styles.previewTitle}>Selected Image:</h3>
-        <div style={styles.imagePreview}>
-          <img src={URL.createObjectURL(selectedImage)} alt="Selected" style={styles.image} />
-        </div>
-      </div>
-    )}
-    <input type="file" accept="image/*" onChange={handleImageChange} />
-
-    <h2 style={styles.title}>Video Uploader</h2>
-      {selectedVideos.map((video, index) => { return (
-        <div key={video} style={styles.previewContainer}>
-          <h3 style={styles.previewTitle}>Selected Video {index + 1}:</h3>
-          <div style={styles.videoContainer}>
-            <button onClick={() => handleVideoRemove(index)} style={styles.removeButton}>Remove</button>
-            <div style={styles.videoPreview}>
-              <video key={video} width="400" height="300" controls style={styles.video}>
-                <source src={URL.createObjectURL(video)} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
+    <div>
+      <Header />
+      <div style={styles.container}>
+        <h2 style={styles.title}>Image Uploader</h2>
+        {selectedImage && (
+          <div style={styles.previewContainer}>
+            <h3 style={styles.previewTitle}>Selected Image:</h3>
+            <div style={styles.imagePreview}>
+              <img src={URL.createObjectURL(selectedImage)} alt="Selected" style={styles.image} />
             </div>
           </div>
+        )}
+        <input type="file" accept="image/*" onChange={handleImageChange} />
+
+        <h2 style={styles.title}>Video Uploader</h2>
+        {selectedVideos.map((video, index) => {
+          return (
+            <div key={video} style={styles.previewContainer}>
+              <h3 style={styles.previewTitle}>Selected Video {index + 1}:</h3>
+              <div style={styles.videoContainer}>
+                <button onClick={() => handleVideoRemove(index)} style={styles.removeButton}>Remove</button>
+                <div style={styles.videoPreview}>
+                  <video key={video} width="400" height="300" controls style={styles.video}>
+                    <source src={URL.createObjectURL(video)} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <input type="file" accept="video/*" onChange={handleVideoChange} style={{ display: 'none' }} id="video-upload" />
+        <label htmlFor="video-upload" style={styles.customVideoInput}>Choose Video</label>
+        <div style={styles.container}>
+          <button onClick={handleUpload} style={styles.uploadButton}>Upload</button>
         </div>
-      )})}
-    <input type="file" accept="video/*" onChange={handleVideoChange} style={{ display:'none'}} id="video-upload"/>
-    <label htmlFor="video-upload" style={styles.customVideoInput}>Choose Video</label>
-    <div style={styles.container}>
-      <button onClick={handleUpload} style={styles.uploadButton}>Upload</button>
+      </div>
     </div>
-  </div>
   );
 };
 
