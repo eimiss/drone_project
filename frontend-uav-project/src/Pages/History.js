@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Header from '../Components/Header';
 function History() {
     // Videos
     const [videos, setVideos] = useState([]);
@@ -39,22 +40,25 @@ function History() {
     }
 
     return (
-        <div style={allVideosStyle.divStyle}>
-            <h1>Video list</h1>
-            {videos.map((video) => (
-                <div key={video.name} style={allVideosStyle.videoContainer} onMouseOver={(e) =>
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'} onMouseOut={(e) =>
-                        e.currentTarget.style.backgroundColor = 'transparent'} onClick={() => changeVideo(video.name)}>
-                    <div style={allVideosStyle.thumbnailContainer}>
-                        <img src={`data:image/jpeg;base64, ${video.frame}`} alt="Thumbnail" style={allVideosStyle.thumbnail} />
+        <div>
+            <Header />
+            <div style={allVideosStyle.divStyle}>
+                <h1>Video list</h1>
+                {videos.map((video) => (
+                    <div key={video.name} style={allVideosStyle.videoContainer} onMouseOver={(e) =>
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'} onMouseOut={(e) =>
+                            e.currentTarget.style.backgroundColor = 'transparent'} onClick={() => changeVideo(video.name)}>
+                        <div style={allVideosStyle.thumbnailContainer}>
+                            <img src={`data:image/jpeg;base64, ${video.frame}`} alt="Thumbnail" style={allVideosStyle.thumbnail} />
+                        </div>
+                        <div style={allVideosStyle.videoInfo}>
+                            <h2>{video.name}</h2>
+                            <p>{video.created_date}</p>
+                        </div>
+                        <p style={allVideosStyle.videoDuration}>{video.duration} seconds</p>
                     </div>
-                    <div style={allVideosStyle.videoInfo}>
-                        <h2>{video.name}</h2>
-                        <p>{video.created_date}</p>
-                    </div>
-                    <p style={allVideosStyle.videoDuration}>{video.duration} seconds</p>
-                </div>
-            ))}
+                ))}
+            </div>
         </div>
     )
 }

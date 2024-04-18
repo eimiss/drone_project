@@ -16,6 +16,9 @@ function Header() {
     const navigateUpload = () => {
         navigate('/fileUploader');
     }
+    const navigateUploadFromMap = () => {
+        navigate('/fileUploaderFromMap');
+    }
 
     const navigateHistory = () => {
         navigate('/history');
@@ -29,18 +32,26 @@ function Header() {
                 onMouseLeave={handleMouseLeave}
                 onClick={navigateUpload}
             >
-                Upload Videos
+                Upload Videos And Image
             </button>
             <button
                 style={hoveredButton === 2 ? { ...headerStyle.button, ...headerStyle.buttonHover } : headerStyle.button}
                 onMouseEnter={() => handleMouseEnter(2)}
                 onMouseLeave={handleMouseLeave}
+                onClick={navigateUploadFromMap}
             >
-                Drone view
+                Upload Videos With Map
             </button>
             <button
                 style={hoveredButton === 3 ? { ...headerStyle.button, ...headerStyle.buttonHover } : headerStyle.button}
                 onMouseEnter={() => handleMouseEnter(3)}
+                onMouseLeave={handleMouseLeave}
+            >
+                Drone view
+            </button>
+            <button
+                style={hoveredButton === 4 ? { ...headerStyle.button, ...headerStyle.buttonHover } : headerStyle.button}
+                onMouseEnter={() => handleMouseEnter(4)}
                 onMouseLeave={handleMouseLeave}
                 onClick={navigateHistory}
             >

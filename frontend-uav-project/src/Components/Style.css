@@ -1,0 +1,11 @@
+/* height of the container */
+.leaflet-container {
+    top: 5px;
+    margin: auto;
+    padding: 20px;
+    height: 720px;
+    width: 1280px;
+    border-radius: 2rem;
+    border: '5px solid',
+  }
+  

@@ -209,3 +209,34 @@ def feature_extraction_and_overlay(base_image, overlay_image, image_number, imag
     drone.prev_image = overlay_image
         
     return image_array, drone
+
+def feature_extraction_and_overlay_map(base_image, base_image_points, overlay_image, overlay_image_points, image_array, image_number):
+    result_image, transformation_matrix = warp_image(overlay_image, base_image, overlay_image_points, base_image_points)
+    rotation = np.arctan2(transformation_matrix[0, 1], transformation_matrix[0, 0])
+    rotation_angle_degrees = np.degrees(rotation)
+
+    result_image_rotated = imutils.rotate_bound(overlay_image, -rotation_angle_degrees)
+    rotated_points = rotate_points_main(overlay_image, result_image_rotated, overlay_image_points, rotation_angle_degrees)
+
+    result_image, transformation_matrix = warp_image(result_image_rotated, base_image, rotated_points, base_image_points)
+
+    # load image
+    transparent_image = make_background_transparent(result_image)
+    # Extract the foreground and alpha channels
+    foreground_img = transparent_image[:, :, :3]
+    alpha_mask = transparent_image[:, :, 3]
+
+    # Create a mask for the transparent regions
+    inverse_alpha_mask = cv2.bitwise_not(alpha_mask)
+
+    # Create a masked foreground image
+    masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
+
+    # Create a masked background image
+    masked_background = cv2.bitwise_and(image_array[image_number], image_array[image_number], mask=inverse_alpha_mask)
+
+    # Overlay the masked foreground onto the masked background
+    overlayed_image = cv2.add(masked_foreground, masked_background)
+
+    image_array[image_number] = overlayed_image
+    return image_array, transformation_matrix, rotation_angle_degrees
