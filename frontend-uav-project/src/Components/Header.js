@@ -24,6 +24,10 @@ function Header() {
         navigate('/history');
     }
 
+    const navigateDroneView = () => {
+        navigate('/droneView');
+    }
+
     return (
         <div style={headerStyle.header}>
             <button
@@ -46,6 +50,7 @@ function Header() {
                 style={hoveredButton === 3 ? { ...headerStyle.button, ...headerStyle.buttonHover } : headerStyle.button}
                 onMouseEnter={() => handleMouseEnter(3)}
                 onMouseLeave={handleMouseLeave}
+                onClick={navigateDroneView}
             >
                 Drone view
             </button>

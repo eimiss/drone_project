@@ -4,6 +4,7 @@ import FileUploaderFromMap from "./Pages/FileUploaderFromMap";
 import MainPage from "./Pages/MainPage";
 import VideoWatch from "./Pages/VideoWatch";
 import History from "./Pages/History";
+import DroneView from "./Pages/DroneView";
 
 export const Routing = () => {
     return(
@@ -14,6 +15,7 @@ export const Routing = () => {
                 <Route path="/fileUploaderFromMap" element={<FileUploaderFromMap />} />
                 <Route path="/videoWatch" element={<VideoWatch />} />
                 <Route path="/history" element={<History />} />
+                <Route path="/droneView" element={<DroneView />} />
             </Routes>
         </Router>
     )

@@ -1,27 +1,42 @@
+import threading
+import base64
 import datetime
 import json
+import os
+import numpy as np
+import cv2
+import io
+import time
+
+from flask_socketio import SocketIO, emit
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from functions.videoToImageAndBack import convert_video_to_images, create_video, transcode_video
 from functions.feature_extraction_and_overlay import feature_extraction_and_overlay, feature_extraction_and_overlay_map
 from functions.optical_flow import optical_flow, optical_flow_map
 from functions.video_information import get_videos_information
-import os
-import numpy as np
-import cv2
-import io
-
 
 
 app = Flask(__name__)
 CORS(app)
+MAX_BUFFER_SIZE = 50 * 1000 * 1000
+socketio = SocketIO(app, cors_allowed_origins="*", 
+                    async_mode='threading', max_http_buffer_size=MAX_BUFFER_SIZE, 
+                    always_connect=True, use_reloader=False)
 
 # give one folder before path
 UPLOAD_FOLDER_VIDEO = 'uploaded_files'
 app.config['UPLOAD_FOLDER_VIDEO'] = UPLOAD_FOLDER_VIDEO
 
+# Global variables
+global_frames = {}
+terminate_threads = {}
+thread_lock = threading.Lock()
+air_drones = []
+image_for_live = None
+
 class drone_config:
-    def __init__(self, average_difference, coeff, rotation, frames, transformation_matrix, isWarpped, prev_image):
+    def __init__(self, average_difference, coeff, rotation, frames, transformation_matrix, isWarpped, prev_image, rtsp, image_number):
         self.average_difference = average_difference
         self.coeff = coeff
         self.rotation = rotation
@@ -29,6 +44,8 @@ class drone_config:
         self.transformation_matrix = transformation_matrix
         self.isWarped = isWarpped
         self.prev_image = prev_image
+        self.rtsp = rtsp
+        self.image_number = image_number
 
 class images_from_video:
     def __init__(self, videoImage, video, videoPoints, videoResolution):
@@ -56,7 +73,7 @@ def handle_upload():
         if video.filename == '':
             return jsonify({'message': 'Invalid video filename'}), 400
         frames = convert_video_to_images(video)
-        drone = drone_config([], 1, 0, frames, None, False, None)
+        drone = drone_config([], 1, 0, frames, None, False, None, None, 0)
         drones.append(drone)
 
     #--------------------------------------------------
@@ -286,5 +303,138 @@ def handle_upload_from_map():
     
     return jsonify({'message': 'Image uploaded successfully'})
 
+@app.route('/api/air_drone_image', methods=['POST'])
+def air_drone_image():
+    global image_for_live
+    if 'image' not in request.files:
+        return jsonify({'message': 'No image uploaded'}), 400
+    image = request.files['image']
+    if image.filename == '':
+        return jsonify({'message': 'No image selected'}), 400
+    image_bytes = image.read()
+
+    image_frame = np.frombuffer(image_bytes, dtype=np.uint8)
+    image_decoded = cv2.imdecode(image_frame, cv2.IMREAD_UNCHANGED)
+
+    new_width = int(image_decoded.shape[1] * (2/3))
+    new_height = int(image_decoded.shape[0] * (2/3))
+
+    image = cv2.resize(image_decoded, (new_width, new_height))
+
+    image_for_live = image
+    return jsonify({'message': 'Image uploaded successfully'})
+
+# SocketIO events
+@socketio.on('connect')
+def test_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def test_disconnect():
+    print('Client disconnected')
+
+def read_rtsp_stream(rtsp_url):
+    cap = cv2.VideoCapture(rtsp_url)
+    if not cap.isOpened():
+        print(f"Error opening stream for {rtsp_url}")
+        return
+
+    while not terminate_threads.get(rtsp_url, False):
+        ret, frame = cap.read()
+        if not ret:
+            print(f"Error reading frame from {rtsp_url}")
+            break
+
+        with thread_lock:
+            global_frames[rtsp_url] = frame
+
+    cap.release()
+
+def start_rtsp_stream(rtsp_urls):
+    global terminate_threads
+
+    # Terminate existing threads for the URLs
+    for url in terminate_threads:
+        terminate_threads[url] = True
+
+    # Start new tasks for each RTSP URL
+    for rtsp_url in rtsp_urls:
+        terminate_threads[rtsp_url] = False
+        socketio.start_background_task(target=read_rtsp_stream, rtsp_url=rtsp_url)
+
+def stop_rtsp_stream(rtsp_urls):
+    global terminate_threads
+    for url in rtsp_urls:
+        terminate_threads[url] = True
+
+# Function to get the latest frame for an RTSP URL
+def get_frame_from_global(rtsp_url):
+    global global_frames
+    with thread_lock:
+        return global_frames.get(rtsp_url, None)
+
+@socketio.on('set_up_rtsps')
+def set_up_rtsps(rtsp_urls):
+    print("Setting up RTSPs")
+    start_rtsp_stream(rtsp_urls)
+
+@socketio.on('stop_rtsps')
+def stop_rtsps(rtsp_urls):
+    print("Stopping RTSPs")
+    stop_rtsp_stream(rtsp_urls)
+
+@socketio.on('resync_drones')
+def resync_drones():
+    for drone in air_drones:
+        drone.isWarped = False
+
+@socketio.on('get_frames')
+def get_frames_live(rtsp_urls):
+    global image_for_live
+    image = image_for_live
+    if image is None:
+        emit('frame_error', 'No image available')
+
+    # Drone initialization
+    for rtsp_url in rtsp_urls:
+        counter = 0
+        for drone in air_drones:
+            if drone.rtsp == rtsp_url:
+                frame = get_frame_from_global(drone.rtsp)
+                if frame is not None:
+                    new_width = int(frame.shape[1] * (2/3))
+                    new_height = int(frame.shape[0] * (2/3))
+                    frame = cv2.resize(frame, (new_width, new_height))
+
+                    drone.frames = [frame]
+                    counter += 1
+        if counter == 0:
+            frame = get_frame_from_global(rtsp_url)
+            if frame is not None:
+                new_width = int(frame.shape[1] * (2/3))
+                new_height = int(frame.shape[0] * (2/3))
+                frame = cv2.resize(frame, (new_width, new_height))
+
+                drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0)
+                air_drones.append(drone)
+    
+    image_array = [image]
+    if image_array is not None:
+        for drone in air_drones:
+            if drone.isWarped:
+                image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0)
+            else:
+                print("Extracting features")
+                image_array, drone = feature_extraction_and_overlay(image, drone.frames[0], 0, image_array, drone)
+
+    mainImage = image_array[0]
+    ret, buffer = cv2.imencode('.jpg', mainImage)
+    if not ret:
+        emit('frame_error', 'Error encoding image')
+    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+    emit('frame_response', jpg_as_text)
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app)
+    
