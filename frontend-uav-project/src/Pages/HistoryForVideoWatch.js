@@ -40,8 +40,7 @@ function History() {
     }
 
     return (
-        <div style={allVideosStyle.fullDiv}>
-            <Header />
+        <div>
             <div style={allVideosStyle.divStyle}>
                 <h1>Video list</h1>
                 {videos.map((video) => (
@@ -66,20 +65,15 @@ function History() {
 export default History;
 
 const allVideosStyle = {
-    fullDiv: {
-        backgroundColor: '#020853',
-        height: '100vh',
-    },
     divStyle: {
         borderRadius: '20px',
         backgroundColor: '#01041b',
         overflow: "hidden",
-        width: "100%",
+        width: "80%",
         margin: "0 auto",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        marginTop: "30px",
         color: "white"
     },
     videoContainer: {

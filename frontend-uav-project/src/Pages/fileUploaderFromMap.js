@@ -1,6 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Header from '../Components/Header';
 import { Await } from 'react-router-dom';
+import { Map, TileLayer, withLeaflet } from 'react-leaflet';
+import '../Components/Style.css';
+import 'leaflet/dist/leaflet.css';
+import PrintControlDefault from 'react-leaflet-easyprint';
+import { FaPhotoVideo } from "react-icons/fa";
+import { IoImagesSharp } from "react-icons/io5";
+
 
 const fetchImage = async (video) => {
     const response = await fetch(video.imageFile);
@@ -14,7 +21,8 @@ const UploaderFromMap = () => {
     const imageRef = useRef(null);
     const [videoData, setVideoData] = useState([]);
     const videoRefs = useRef([]);
-
+    const PrintControl = withLeaflet(PrintControlDefault);
+    const printControlRef = useRef(null);
 
     const handleImageChange = (event) => {
         const imageFile = event.target.files[0];
@@ -69,8 +77,8 @@ const UploaderFromMap = () => {
         const formData = new FormData();
         if (imageData) {
             const imageFile = await fetch(imageData.imageFile)
-            .then(res => res.blob())
-            .then(blob => new File([blob], 'image.png', { type: 'image/png' }));
+                .then(res => res.blob())
+                .then(blob => new File([blob], 'image.png', { type: 'image/png' }));
             formData.append('imageFile', imageFile);
             formData.append('imagePoints', JSON.stringify(imageData.points));
             formData.append('imageResolution', JSON.stringify(imageData.resolution));
@@ -99,9 +107,9 @@ const UploaderFromMap = () => {
     }
 
     const getImageSize = () => {
-        if(imageRef.current) {
+        if (imageRef.current) {
             const { width, height } = imageRef.current.getBoundingClientRect();
-            const newImageData = {...imageData}
+            const newImageData = { ...imageData }
             newImageData.resolution = { width, height }
             setImageData(newImageData);
         }
@@ -138,9 +146,23 @@ const UploaderFromMap = () => {
     };
 
     return (
-        <div>
+        <div style={styles.fullDiv}>
             <Header />
-            <div style={styles.container}>
+            <div style={styles.blackBorders}>
+                <h2>Map</h2>
+                <div>
+                    <Map
+                        center={[54.8990, 23.9128]}
+                        zoom={13}
+                        style={{ width: '1280px', height: '400px' }}
+                    >
+                        <TileLayer
+                            url="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        />
+                        <PrintControl position="topleft" sizeModes={['Current', 'A4Portrait', 'A4Landscape']} hideControlContainer={false} title="Export as PNG" exportOnly />
+                    </Map>
+                </div>
                 <h2>Image Uploader</h2>
                 {imageData.imageFile && (
                     <div>
@@ -158,8 +180,9 @@ const UploaderFromMap = () => {
                         </div>
                     </div>
                 )}
-                <input type="file" accept="image/*" onChange={handleImageChange} />
-                <h3>Selected Videos:</h3>
+                <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} id="image-input" />
+                <label htmlFor="image-input"><IoImagesSharp size={32} /></label>
+                <h2>Selected Videos:</h2>
                 {videoData.map((video, index) => (
                     <div key={index} style={{ position: 'relative' }}>
                         <img
@@ -173,7 +196,8 @@ const UploaderFromMap = () => {
                         <RenderPoints points={video.points} />
                     </div>
                 ))}
-                <input type="file" accept="video/*" onChange={handleVideoChange} />
+                <input type="file" accept="video/*" onChange={handleVideoChange} style={{ display: 'none' }} id="video-input" />
+                <label htmlFor="video-input"><FaPhotoVideo size={32} /></label>
                 <div style={styles.container}>
                     <button onClick={handleUploadFromMap} style={styles.uploadButton}>Upload</button>
                 </div>
@@ -185,15 +209,33 @@ const UploaderFromMap = () => {
 export default UploaderFromMap;
 
 const styles = {
-    container: {
-        maxWidth: '1280px',
-        margin: 'auto',
+    fullDiv: {
+        backgroundColor: '#020853',
+        height: '200vh',
+    },
+    blackBorders: {
+        backgroundColor: '#020831',
+        borderRadius: '10px',
         padding: '20px',
-        fontFamily: 'Arial, sans-serif',
+        color: 'white',
+        margin: 'auto',
+        maxWidth: '1280px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginTop: "10px"
     },
     image: {
         width: '100%',
         height: 'auto',
-    }
+    },
+    uploadButton: {
+        backgroundColor: '#007bff',
+        color: '#000',
+        padding: '10px 20px',
+        fontSize: '20px',
+        cursor: 'pointer',
+        marginTop: '100px',
+    },
 };
 

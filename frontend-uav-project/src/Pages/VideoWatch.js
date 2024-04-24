@@ -5,7 +5,7 @@ import pauseIcon from '../Images/PauseButton.png';
 import zoomInIcon from '../Images/ZoomIn.png';
 import zoomOutIcon from '../Images/ZoomOut.png';
 import Header from '../Components/Header';
-import History from '../Pages/History';
+import History from '../Pages/HistoryForVideoWatch';
 
 
 const VideoWatch = () => {
@@ -213,8 +213,8 @@ const VideoWatch = () => {
                     <button onClick={zoomIn}><img src={zoomInIcon} alt="Zoom in" style={stylesVideo.iconStyle} /></button>
                     <button onClick={zoomOut}><img src={zoomOutIcon} alt="Zoom out" style={stylesVideo.iconStyle} /></button>
                 </div>
-                <History />
             </div>
+            <History />
         </div>
     );
 };

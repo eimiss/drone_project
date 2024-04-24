@@ -1,6 +1,7 @@
 import Header from '../Components/Header';
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client'
+import placeHolder from '../Images/placeholder.png';
 
 const socket = io('http://localhost:5000');
 
@@ -70,7 +71,7 @@ const DroneView = () => {
         };
     }, [isLiveOn, rtsps]);
 
-    
+
     const startVideoUpdate = () => {
         if (rtsps.length === 0) {
             console.log('No RTSPs to display');
@@ -109,19 +110,35 @@ const DroneView = () => {
             <div style={stylesDroneView.blackBorders}>
                 <h1>Drone View</h1>
                 <input type="file" accept="image/*" onChange={handleImageChange} />
-                {shownImage && <img style={stylesDroneView.containerVideo} src={shownImage} alt="Selected image" />}
-                <input
-                    type="text"
-                    value={text}
-                    onChange={handleTextChange}
-                />
-                <button onClick={handleRtspChange}>Add RTSP</button>
-                {rtsps.map((rtsp, index) => (
-                    <p key={index}>{rtsp}</p>
-                ))}
-                {isLiveOn ? <button onClick={stopVideoUpdate}>Stop</button> : <button onClick={startVideoUpdate}>Start</button>}
-                <button onClick={setUpRtsps}>Set up rtsps</button>
-                <button onClick={resyncDrones}>Resync drones</button>
+                {shownImage ? (
+                    <img style={stylesDroneView.containerVideo} src={shownImage} alt="Selected image" />
+                ) : (
+                    <img src={placeHolder} alt="Placeholder" style={stylesDroneView.containerVideo} />
+                )}
+                <div style={stylesDroneView.firstDiv}>
+                    <div>
+                        <h1>Input Drone RTSP</h1>
+                        <input
+                            type="text"
+                            value={text}
+                            onChange={handleTextChange}
+                            style={stylesDroneView.inputStyle}
+                        />
+                        <div>
+                            <button onClick={handleRtspChange}>Add RTSP</button>
+                            <button onClick={setUpRtsps}>Set up rtsps</button>
+                        </div>
+                    </div>
+                    <div>
+                        {rtsps.map((rtsp, index) => (
+                            <p key={index}>{rtsp}</p>
+                        ))}
+                    </div>
+                    <div>
+                        {isLiveOn ? <button onClick={stopVideoUpdate} style={stylesDroneView.uploadButton}>Stop</button> : <button onClick={startVideoUpdate} style={stylesDroneView.uploadButton}>Start</button>}
+                        <button onClick={resyncDrones} style={stylesDroneView.uploadButton}>Resync drones</button>
+                    </div>
+                </div>
             </div>
         </div>
     )
@@ -142,6 +159,7 @@ const stylesDroneView = {
     },
     fullDiv: {
         backgroundColor: '#020853',
+        height: '150vh',
     },
     blackBorders: {
         backgroundColor: '#020831',
@@ -154,5 +172,26 @@ const stylesDroneView = {
         flexDirection: 'column',
         alignItems: 'center',
         marginTop: "10px"
-    }
+    },
+    inputStyle: {
+        border: '2px solid #ccc',
+        borderRadius: '5px',
+        padding: '10px',
+        width: '300px',
+        display: 'flex',
+        alignItems: 'center',
+    },
+    firstDiv: {
+        display: 'flex',
+        gap: '400px'
+    },
+    uploadButton: {
+        backgroundColor: '#007bff',
+        color: '#000',
+        padding: '20px 20px',
+        fontSize: '20px',
+        cursor: 'pointer',
+        marginTop: '20px',
+        width: '110px', // Set a fixed width for all buttons
+    },
 }
