@@ -106,8 +106,8 @@ def optical_flow(base_image, overlay_image, drone, image_array, image_number):
     # Update previous frame
     drone.prev_image = overlay_image
 
-    # if image_number % 100 == 0:
-    #     drone.isWarped = False
+    if image_number % 100 == 0:
+        drone.isWarped = False
     
     return image_array, drone
 

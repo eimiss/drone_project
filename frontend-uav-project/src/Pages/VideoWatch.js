@@ -92,11 +92,11 @@ const VideoWatch = () => {
         const updateDuration = () => {
             setDuration(videoRef.current.duration);
         };
-
-        videoRef.current.addEventListener("loadedmetadata", updateDuration);
+        const instance = videoRef.current;
+        instance.addEventListener("loadedmetadata", updateDuration);
 
         return () => {
-            videoRef.current.removeEventListener("loadedmetadata", updateDuration);
+            instance.removeEventListener("loadedmetadata", updateDuration);
         };
     }, []);
 
@@ -106,10 +106,11 @@ const VideoWatch = () => {
             setCurrentTime(videoRef.current.currentTime);
         };
 
-        videoRef.current.addEventListener("timeupdate", updateTime);
+        const instance = videoRef.current;
+        instance.addEventListener("timeupdate", updateTime);
 
         return () => {
-            videoRef.current.removeEventListener("timeupdate", updateTime);
+            instance.removeEventListener("timeupdate", updateTime);
         };
     }, []);
 

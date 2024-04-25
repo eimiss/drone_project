@@ -5,6 +5,7 @@ import MainPage from "./Pages/MainPage";
 import VideoWatch from "./Pages/VideoWatch";
 import History from "./Pages/History";
 import DroneView from "./Pages/DroneView";
+import React from 'react'
 
 export const Routing = () => {
     return(

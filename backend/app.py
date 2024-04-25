@@ -22,7 +22,7 @@ CORS(app)
 MAX_BUFFER_SIZE = 50 * 1000 * 1000
 socketio = SocketIO(app, cors_allowed_origins="*", 
                     async_mode='threading', max_http_buffer_size=MAX_BUFFER_SIZE, 
-                    always_connect=True, use_reloader=False)
+                    always_connect=True)
 
 # give one folder before path
 UPLOAD_FOLDER_VIDEO = 'uploaded_files'
@@ -93,6 +93,8 @@ def handle_upload():
     new_width = int(image.shape[1] * (2/3))
     new_height = int(image.shape[0] * (2/3))
     image = cv2.resize(image, (new_width, new_height))
+    b, g, r, _ = cv2.split(image)
+    image = cv2.merge((b, g, r))
 
     for drone in drones:
         size = len(drone.frames)
@@ -195,9 +197,11 @@ def handle_upload_from_map():
         return jsonify({'message': 'No image resolution uploaded'}), 400
     
     base_image = cv2.imdecode(image_frame, cv2.IMREAD_UNCHANGED)
-    new_width = int(base_image.shape[1] * (2/3))
-    new_height = int(base_image.shape[0] * (2/3))
+    new_width = int(base_image.shape[1])
+    new_height = int(base_image.shape[0])
     base_image = cv2.resize(base_image, (new_width, new_height))
+    b, g, r, _ = cv2.split(base_image)
+    base_image = cv2.merge((b, g, r))
 
     image_resolution = json.loads(image_resolution)
     image_resolution_x = image_resolution['width']
@@ -417,12 +421,15 @@ def get_frames_live(rtsp_urls):
 
                 drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0)
                 air_drones.append(drone)
-    
+
+    b, g, r, _ = cv2.split(image)
+    image = cv2.merge((b, g, r))
     image_array = [image]
     if image_array is not None:
         for drone in air_drones:
             if drone.isWarped:
                 image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0)
+                drone.isWarped = True
             else:
                 print("Extracting features")
                 image_array, drone = feature_extraction_and_overlay(image, drone.frames[0], 0, image_array, drone)
@@ -436,5 +443,5 @@ def get_frames_live(rtsp_urls):
 
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app, debug=True)
     

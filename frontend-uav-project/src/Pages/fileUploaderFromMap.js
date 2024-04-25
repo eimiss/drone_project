@@ -154,7 +154,7 @@ const UploaderFromMap = () => {
                     <Map
                         center={[54.8990, 23.9128]}
                         zoom={13}
-                        style={{ width: '1280px', height: '400px' }}
+                        style={{ width: '1280px', height: '720px' }}
                     >
                         <TileLayer
                             url="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
