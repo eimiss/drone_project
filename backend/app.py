@@ -88,13 +88,11 @@ def handle_upload():
     
     image_bytes = image.read()
     image_frame = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(image_frame, cv2.IMREAD_UNCHANGED)
+    image = cv2.imdecode(image_frame, cv2.IMREAD_COLOR)
 
     new_width = int(image.shape[1] * (2/3))
     new_height = int(image.shape[0] * (2/3))
     image = cv2.resize(image, (new_width, new_height))
-    b, g, r, _ = cv2.split(image)
-    image = cv2.merge((b, g, r))
 
     for drone in drones:
         size = len(drone.frames)
@@ -111,15 +109,12 @@ def handle_upload():
             else:
                 image_array, drone = feature_extraction_and_overlay(image, drone.frames[i], i, image_array, drone)
 
-    # make right now time into string
     now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_video_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], 'Temp.mp4')
     print(output_video_path)
     create_video(image_array, output_video_path)
-    # get one image resolution (separate)
     output_video_path_new = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], f'{now}.mp4')
     transcode_video(output_video_path, output_video_path_new)
-    # remove temp video
     os.remove(output_video_path)
     video_url = f"http://localhost:5000/api/video/{output_video_path_new}"
     return jsonify({'message': 'Files uploaded successfully',
@@ -129,7 +124,6 @@ def handle_upload():
 def change_video():
     if 'chosen_video_name' not in request.form:    
         return jsonify({'message': 'No videos uploaded'}), 400
-    # # Checking if video exists in the path
     video_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], request.form['chosen_video_name'])  
     if not os.path.exists(video_path):
         return jsonify({'message': 'Video not found'}), 400
@@ -196,12 +190,10 @@ def handle_upload_from_map():
     if image_resolution is None:
         return jsonify({'message': 'No image resolution uploaded'}), 400
     
-    base_image = cv2.imdecode(image_frame, cv2.IMREAD_UNCHANGED)
+    base_image = cv2.imdecode(image_frame, cv2.IMREAD_COLOR)
     new_width = int(base_image.shape[1])
     new_height = int(base_image.shape[0])
     base_image = cv2.resize(base_image, (new_width, new_height))
-    b, g, r, _ = cv2.split(base_image)
-    base_image = cv2.merge((b, g, r))
 
     image_resolution = json.loads(image_resolution)
     image_resolution_x = image_resolution['width']
@@ -227,7 +219,7 @@ def handle_upload_from_map():
             return jsonify({'message': 'No video image selected'}), 400
         video_image_bytes = video_image.read()
         video_image_frame = np.frombuffer(video_image_bytes, dtype=np.uint8)
-        video_image_decoded = cv2.imdecode(video_image_frame, cv2.IMREAD_UNCHANGED)
+        video_image_decoded = cv2.imdecode(video_image_frame, cv2.IMREAD_COLOR)
         
         new_width = int(video_image_decoded.shape[1] * (2/3))
         new_height = int(video_image_decoded.shape[0] * (2/3))
@@ -294,18 +286,18 @@ def handle_upload_from_map():
             else:
                 image_array, average_difference = optical_flow_map(base_image, video_data.video[i], transf_matrix, video_data.video[i - 1], rotation, average_difference, image_array, i)
     
-    # make right now time into string
     now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_video_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], 'Temp.mp4')
     print(output_video_path)
     create_video(image_array, output_video_path)
-    # get one image resolution (separate)
     output_video_path_new = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], f'{now}.mp4')
     transcode_video(output_video_path, output_video_path_new)
     # remove temp video
     os.remove(output_video_path)
-    
-    return jsonify({'message': 'Image uploaded successfully'})
+    video_url = f"http://localhost:5000/api/video/{output_video_path_new}"
+
+    return jsonify({'message': 'Files uploaded successfully',
+                    'output_video_path': video_url})
 
 @app.route('/api/air_drone_image', methods=['POST'])
 def air_drone_image():
@@ -318,7 +310,7 @@ def air_drone_image():
     image_bytes = image.read()
 
     image_frame = np.frombuffer(image_bytes, dtype=np.uint8)
-    image_decoded = cv2.imdecode(image_frame, cv2.IMREAD_UNCHANGED)
+    image_decoded = cv2.imdecode(image_frame, cv2.IMREAD_COLOR)
 
     new_width = int(image_decoded.shape[1] * (2/3))
     new_height = int(image_decoded.shape[0] * (2/3))
@@ -422,8 +414,6 @@ def get_frames_live(rtsp_urls):
                 drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0)
                 air_drones.append(drone)
 
-    b, g, r, _ = cv2.split(image)
-    image = cv2.merge((b, g, r))
     image_array = [image]
     if image_array is not None:
         for drone in air_drones:

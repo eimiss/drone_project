@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../Components/Header';
 import { Await } from 'react-router-dom';
 import { Map, TileLayer, withLeaflet } from 'react-leaflet';
@@ -23,6 +24,7 @@ const UploaderFromMap = () => {
     const videoRefs = useRef([]);
     const PrintControl = withLeaflet(PrintControlDefault);
     const printControlRef = useRef(null);
+    const navigate = useNavigate();
 
     const handleImageChange = (event) => {
         const imageFile = event.target.files[0];
@@ -101,6 +103,7 @@ const UploaderFromMap = () => {
 
             const data = await response.json();
             console.log(data);
+            navigate('/videoWatch', { state: { videoPath: data.output_video_path } });
         } catch (error) {
             console.error('Error uploading files:', error);
         }

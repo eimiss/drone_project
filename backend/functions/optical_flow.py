@@ -121,7 +121,7 @@ def optical_flow_map(base_image, overlay_image, transf_matrix, prev_image, rotat
     current_image = overlay_image
     rotated_optical_flow_image = imutils.rotate_bound(current_image, -rotation)
 
-    # Compute optical flow
+    # Compute optical flow (Lucas-Kanade method)
     next_pts, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray, current_gray, prev_pts, None)
 
     # Filter valid points
