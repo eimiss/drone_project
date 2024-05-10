@@ -4,8 +4,11 @@ import Header from '../Components/Header';
 import { FaPhotoVideo } from "react-icons/fa";
 import { IoImagesSharp } from "react-icons/io5";
 import placeHolder from '../Images/placeholder.png';
+import '../Components/Spin.css';
 
 const Uploader = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [globalError, setGlobalError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedVideos, setSelectedVideos] = useState([]);
 
@@ -31,7 +34,7 @@ const Uploader = () => {
     selectedVideos.forEach((videoFile) => {
       formData.append('videos', videoFile);
     })
-
+    setIsLoading(true);
     try {
       const response = await fetch('http://localhost:5000/api/upload', {
         method: 'POST',
@@ -39,10 +42,16 @@ const Uploader = () => {
       });
 
       const data = await response.json();
-      console.log(data);
+      if (!response.ok) {
+        throw new Error(data.message);
+      }
+
       navigate('/videoWatch', { state: { videoPath: data.output_video_path } });
     } catch (error) {
-      console.error('Error uploading files:', error);
+      setIsLoading(false);
+      setGlobalError('Error uploading files:' + error.message);
+      console.error('Error uploading files:', error.message);
+
     }
   };
 
@@ -52,9 +61,24 @@ const Uploader = () => {
     }
   }
 
+  const dismissError = () => {
+    setGlobalError(null);
+  };
+
   return (
     <div style={styles.fullDiv}>
       <Header />
+      {isLoading && (
+        <div style={styles.loaderDiv}>
+          <div style={styles.loader}></div>
+        </div>
+      )}
+      {globalError && (
+        <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'red', color: 'white', padding: '10px' }}>
+          <div style={{ flex: 1 }}>{globalError}</div>
+          <button style={{ marginLeft: '10px' }} onClick={dismissError}>X</button>
+        </div>
+      )}
       <div style={styles.blackBorders}>
         <div style={styles.firstDiv}>
           <div style={styles.imageDiv}>
@@ -190,5 +214,25 @@ const styles = {
     justifyContent: 'space-between',
     marginTop: '20px',
     gap: '10px'
+  },
+  loaderDiv: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loader: {
+    border: '8px solid #f3f3f3',
+    borderRadius: '50%',
+    borderTop: '8px solid #3498db',
+    width: '50px',
+    height: '50px',
+    animation: 'spin 1s linear infinite',
   }
 };

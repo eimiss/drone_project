@@ -6,6 +6,8 @@ import placeHolder from '../Images/placeholder.png';
 const socket = io('http://localhost:5000');
 
 const DroneView = () => {
+    const [successPopUp, setSuccessPopUp] = useState(null);
+    const [globalError, setGlobalError] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     const [shownImage, setShownImage] = useState(null);
     const [rtsps, setRtsp] = useState([]);
@@ -38,8 +40,15 @@ const DroneView = () => {
                 body: formData
             });
             const data = await response.json();
-            console.log(data.message);
+            if (!response.ok) {
+                throw new Error(data.message);
+            } else {
+                setGlobalError(null);
+                setSuccessPopUp(data.message);
+                console.log(data.message);
+            }
         } catch (error) {
+            setGlobalError(error.message);
             console.error('Error uploading image:', error);
         }
     }
@@ -62,12 +71,23 @@ const DroneView = () => {
             }
         });
         socket.on('frame_error', (error) => {
+            setGlobalError(error);
+            isLiveOn = false;
             console.error('Frame Error:', error);
         });
-
+        socket.on('resync_response', (data) => {
+            console.log(data);
+            setSuccessPopUp(data);
+        });
+        socket.on('set_up_rtsps_response', (data) => {
+            console.log(data);
+            setSuccessPopUp(data);
+        });
         return () => {
             socket.off('frame_response');
             socket.off('frame_error');
+            socket.off('resync_response');
+            socket.off('set_up_rtsps_response');
         };
     }, [isLiveOn, rtsps]);
 
@@ -75,6 +95,7 @@ const DroneView = () => {
     const startVideoUpdate = () => {
         if (rtsps.length === 0) {
             console.log('No RTSPs to display');
+            setGlobalError('No RTSPs to display');
             return;
         }
 
@@ -86,6 +107,7 @@ const DroneView = () => {
     const stopVideoUpdate = () => {
         if (rtsps.length === 0) {
             console.log('No RTSPs to display');
+            setGlobalError('No RTSPs to display');
             return;
         }
 
@@ -95,6 +117,7 @@ const DroneView = () => {
     const setUpRtsps = () => {
         if (rtsps.length === 0) {
             console.log('No RTSPs to display');
+            setGlobalError('No RTSPs to display');
             return;
         }
 
@@ -104,9 +127,27 @@ const DroneView = () => {
     const resyncDrones = () => {
         socket.emit('resync_drones');
     }
+    const dismissError = () => {
+        setGlobalError(null);
+    };
+    const dismissSuccess = () => {
+        setSuccessPopUp(null);
+    };
     return (
         <div style={stylesDroneView.fullDiv}>
             <Header />
+            {globalError && (
+                <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'red', color: 'white', padding: '10px' }}>
+                    <div style={{ flex: 1 }}>{globalError}</div>
+                    <button style={{ marginLeft: '10px' }} onClick={dismissError}>X</button>
+                </div>
+            )}
+            {successPopUp && (
+                <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'green', color: 'white', padding: '10px' }}>
+                    <div style={{ flex: 1 }}>{successPopUp}</div>
+                    <button style={{ marginLeft: '10px' }} onClick={dismissSuccess}>X</button>
+                </div>
+            )}
             <div style={stylesDroneView.blackBorders}>
                 <h1>Drone View</h1>
                 <input type="file" accept="image/*" onChange={handleImageChange} />
@@ -129,7 +170,7 @@ const DroneView = () => {
                             <button onClick={setUpRtsps}>Set up rtsps</button>
                         </div>
                     </div>
-                    <div>
+                    <div style={stylesDroneView.middleDiv}>
                         {rtsps.map((rtsp, index) => (
                             <p key={index}>{rtsp}</p>
                         ))}
@@ -183,7 +224,14 @@ const stylesDroneView = {
     },
     firstDiv: {
         display: 'flex',
-        gap: '400px'
+        gap: '10px',       
+    },
+    middleDiv: {
+        marginTop: '20px',
+        width: '800px',
+        backgroundColor: '#000000',
+        border: '2px solid black',
+        borderRadius: '10px',
     },
     uploadButton: {
         backgroundColor: '#007bff',

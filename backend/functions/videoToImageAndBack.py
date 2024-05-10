@@ -5,7 +5,13 @@ import numpy as np
 from moviepy.editor import VideoFileClip
 import time
 
+def remove_black_borders(image, border_size):
+    height, width = image.shape[:2]
+    cropped_image = image[border_size:height, border_size:width-border_size]
+    return cropped_image
+
 def convert_video_to_images(video):
+    random_color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
     video_path = "temp_video.mp4"
     video.save(video_path)
     cam = cv2.VideoCapture(video_path)
@@ -14,6 +20,12 @@ def convert_video_to_images(video):
         ret, frame = cam.read()
         if not ret:
             break
+
+        # Removing black borders (should know how many pixels to remove)
+        frame = remove_black_borders(frame, 65)
+        # Adding frames of random color
+        frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=random_color)
+
         new_width = int(frame.shape[1] * (2/3))
         new_height = int(frame.shape[0] * (2/3))
         frame = cv2.resize(frame, (new_width, new_height))

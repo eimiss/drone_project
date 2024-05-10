@@ -18,6 +18,8 @@ const fetchImage = async (video) => {
 };
 
 const UploaderFromMap = () => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [globalError, setGlobalError] = useState(null);
     const [imageData, setImageData] = useState({ imageFile: '', points: [], resolution: { width: 0, height: 0 } });
     const imageRef = useRef(null);
     const [videoData, setVideoData] = useState([]);
@@ -44,12 +46,17 @@ const UploaderFromMap = () => {
                 body: formData
             });
 
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message);
+            }
+
             const blob = await response.blob();
             const imageSrc = URL.createObjectURL(blob);
             setVideoData([...videoData, { videoFile: videoFiles[0], imageFile: imageSrc, points: [], resolution: { width: 0, height: 0 } }]);
 
-
         } catch (error) {
+            setGlobalError(error.message);
             console.error('Error uploading files:', error);
         }
     }
@@ -95,6 +102,7 @@ const UploaderFromMap = () => {
             formData.append('videoPoints', JSON.stringify(video.points));
             formData.append('videoResolution', JSON.stringify(video.resolution));
         });
+        setIsLoading(true);
         try {
             const response = await fetch('http://localhost:5000/api/uploadFromMap', {
                 method: 'POST',
@@ -102,9 +110,14 @@ const UploaderFromMap = () => {
             });
 
             const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message);
+            }
             console.log(data);
             navigate('/videoWatch', { state: { videoPath: data.output_video_path } });
         } catch (error) {
+            setIsLoading(false);
+            setGlobalError(error.message);
             console.error('Error uploading files:', error);
         }
     }
@@ -148,9 +161,24 @@ const UploaderFromMap = () => {
         ));
     };
 
+    const dismissError = () => {
+        setGlobalError(null);
+    };
+
     return (
         <div style={styles.fullDiv}>
             <Header />
+            {isLoading && (
+                <div style={styles.loaderDiv}>
+                    <div style={styles.loader}></div>
+                </div>
+            )}
+            {globalError && (
+                <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'red', color: 'white', padding: '10px' }}>
+                    <div style={{ flex: 1 }}>{globalError}</div>
+                    <button style={{ marginLeft: '10px' }} onClick={dismissError}>X</button>
+                </div>
+            )}
             <div style={styles.blackBorders}>
                 <h2>Map</h2>
                 <div>
@@ -240,5 +268,25 @@ const styles = {
         cursor: 'pointer',
         marginTop: '100px',
     },
+    loaderDiv: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999,
+      },
+      loader: {
+        border: '8px solid #f3f3f3',
+        borderRadius: '50%',
+        borderTop: '8px solid #3498db',
+        width: '50px',
+        height: '50px',
+        animation: 'spin 1s linear infinite',
+      }
 };
 

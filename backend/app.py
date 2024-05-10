@@ -36,7 +36,8 @@ air_drones = []
 image_for_live = None
 
 class drone_config:
-    def __init__(self, average_difference, coeff, rotation, frames, transformation_matrix, isWarpped, prev_image, rtsp, image_number):
+    def __init__(self, average_difference, coeff, rotation, frames, transformation_matrix, isWarpped, prev_image, 
+                 rtsp, image_number, resync, frame_color):
         self.average_difference = average_difference
         self.coeff = coeff
         self.rotation = rotation
@@ -46,6 +47,8 @@ class drone_config:
         self.prev_image = prev_image
         self.rtsp = rtsp
         self.image_number = image_number
+        self.resync = resync
+        self.frame_color = frame_color
 
 class images_from_video:
     def __init__(self, videoImage, video, videoPoints, videoResolution):
@@ -73,7 +76,7 @@ def handle_upload():
         if video.filename == '':
             return jsonify({'message': 'Invalid video filename'}), 400
         frames = convert_video_to_images(video)
-        drone = drone_config([], 1, 0, frames, None, False, None, None, 0)
+        drone = drone_config([], 1, 0, frames, None, False, None, None, 0, False, None)
         drones.append(drone)
 
     #--------------------------------------------------
@@ -158,7 +161,7 @@ def convertFirstFrame():
 
     ret, buffer = cv2.imencode('.jpg', frame)
     if not ret:
-        return jsonify({'message': 'Error encoding image'}), 500
+        return jsonify({'message': 'Error encoding image'}), 400
     return send_file(io.BytesIO(buffer), mimetype='image/jpeg')
 
 @app.route('/api/uploadFromMap', methods=['POST'])
@@ -205,6 +208,9 @@ def handle_upload_from_map():
         x_values[i] = x_values[i] * x_scale
         y_values[i] = y_values[i] * y_scale
         image_points_array.append([x_values[i], y_values[i]])
+
+    if len(image_points_array) < 4:
+        return jsonify({'message': 'Error: Minimum 4 points required'}), 400
 
     # Videos
     if 'videoImage' not in request.files:
@@ -264,10 +270,10 @@ def handle_upload_from_map():
             x = point['x'] * x_scale
             y = point['y'] * y_scale
             video_points_array.append([x, y])
+        if len(video_points_array) != len(image_points_array):
+            return jsonify({'message': 'Error: Different number of points in image and videos'}), 400
         video_data = images_from_video(video_image[i], videos_array[i], video_points_array, [original_width, original_height])
         video_datas.append(video_data)
-    # image_image
-    # video_datas
     for video_data in video_datas:
         size = len(video_data.video)
         if max_image_count < size:
@@ -373,6 +379,7 @@ def get_frame_from_global(rtsp_url):
 def set_up_rtsps(rtsp_urls):
     print("Setting up RTSPs")
     start_rtsp_stream(rtsp_urls)
+    emit('set_up_rtsps_response', 'RTSPs set up')
 
 @socketio.on('stop_rtsps')
 def stop_rtsps(rtsp_urls):
@@ -382,7 +389,9 @@ def stop_rtsps(rtsp_urls):
 @socketio.on('resync_drones')
 def resync_drones():
     for drone in air_drones:
-        drone.isWarped = False
+        drone.resync = True
+    print('drones resynced')
+    emit('resync_response', 'Drones resynced')
 
 @socketio.on('get_frames')
 def get_frames_live(rtsp_urls):
@@ -398,6 +407,7 @@ def get_frames_live(rtsp_urls):
             if drone.rtsp == rtsp_url:
                 frame = get_frame_from_global(drone.rtsp)
                 if frame is not None:
+                    frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=drone.frame_color)
                     new_width = int(frame.shape[1] * (2/3))
                     new_height = int(frame.shape[0] * (2/3))
                     frame = cv2.resize(frame, (new_width, new_height))
@@ -407,11 +417,13 @@ def get_frames_live(rtsp_urls):
         if counter == 0:
             frame = get_frame_from_global(rtsp_url)
             if frame is not None:
+                random_color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
+                frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=random_color)
                 new_width = int(frame.shape[1] * (2/3))
                 new_height = int(frame.shape[0] * (2/3))
                 frame = cv2.resize(frame, (new_width, new_height))
 
-                drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0)
+                drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0, False, random_color)
                 air_drones.append(drone)
 
     image_array = [image]
@@ -419,7 +431,11 @@ def get_frames_live(rtsp_urls):
         for drone in air_drones:
             if drone.isWarped:
                 image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0)
-                drone.isWarped = True
+                if drone.resync:
+                    drone.isWarped = False
+                    drone.resync = False
+                else:
+                    drone.isWarped = True
             else:
                 print("Extracting features")
                 image_array, drone = feature_extraction_and_overlay(image, drone.frames[0], 0, image_array, drone)
