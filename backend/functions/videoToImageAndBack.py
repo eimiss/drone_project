@@ -3,7 +3,6 @@ import cv2
 import os
 import numpy as np
 from moviepy.editor import VideoFileClip
-import time
 
 def remove_black_borders(image, border_size):
     height, width = image.shape[:2]

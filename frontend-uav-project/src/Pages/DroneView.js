@@ -58,8 +58,12 @@ const DroneView = () => {
     }
 
     const handleRtspChange = () => {
-        setRtsp([...rtsps, text]);
-        setText('');
+        if (text.length > 0) {
+            setRtsp([...rtsps, text]);
+            setText('');
+        } else {
+            setGlobalError('Cannot add empty RTSP URL');
+        }
     }
 
     useEffect(() => {
@@ -72,8 +76,8 @@ const DroneView = () => {
         });
         socket.on('frame_error', (error) => {
             setGlobalError(error);
-            isLiveOn = false;
-            console.error('Frame Error:', error);
+            setIsLiveOn(false);
+            console.log('Frame Error:', error);
         });
         socket.on('resync_response', (data) => {
             console.log(data);

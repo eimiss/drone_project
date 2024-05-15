@@ -399,53 +399,53 @@ def get_frames_live(rtsp_urls):
     image = image_for_live
     if image is None:
         emit('frame_error', 'No image available')
+    else:
+        # Drone initialization
+        for rtsp_url in rtsp_urls:
+            counter = 0
+            for drone in air_drones:
+                if drone.rtsp == rtsp_url:
+                    frame = get_frame_from_global(drone.rtsp)
+                    if frame is not None:
+                        frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=drone.frame_color)
+                        new_width = int(frame.shape[1] * (2/3))
+                        new_height = int(frame.shape[0] * (2/3))
+                        frame = cv2.resize(frame, (new_width, new_height))
 
-    # Drone initialization
-    for rtsp_url in rtsp_urls:
-        counter = 0
-        for drone in air_drones:
-            if drone.rtsp == rtsp_url:
-                frame = get_frame_from_global(drone.rtsp)
+                        drone.frames = [frame]
+                        counter += 1
+            if counter == 0:
+                frame = get_frame_from_global(rtsp_url)
                 if frame is not None:
-                    frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=drone.frame_color)
+                    random_color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
+                    frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=random_color)
                     new_width = int(frame.shape[1] * (2/3))
                     new_height = int(frame.shape[0] * (2/3))
                     frame = cv2.resize(frame, (new_width, new_height))
 
-                    drone.frames = [frame]
-                    counter += 1
-        if counter == 0:
-            frame = get_frame_from_global(rtsp_url)
-            if frame is not None:
-                random_color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
-                frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=random_color)
-                new_width = int(frame.shape[1] * (2/3))
-                new_height = int(frame.shape[0] * (2/3))
-                frame = cv2.resize(frame, (new_width, new_height))
+                    drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0, False, random_color)
+                    air_drones.append(drone)
 
-                drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0, False, random_color)
-                air_drones.append(drone)
-
-    image_array = [image]
-    if image_array is not None:
-        for drone in air_drones:
-            if drone.isWarped:
-                image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0)
-                if drone.resync:
-                    drone.isWarped = False
-                    drone.resync = False
+        image_array = [image]
+        if image_array is not None:
+            for drone in air_drones:
+                if drone.isWarped:
+                    image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0)
+                    if drone.resync:
+                        drone.isWarped = False
+                        drone.resync = False
+                    else:
+                        drone.isWarped = True
                 else:
-                    drone.isWarped = True
-            else:
-                print("Extracting features")
-                image_array, drone = feature_extraction_and_overlay(image, drone.frames[0], 0, image_array, drone)
+                    print("Extracting features")
+                    image_array, drone = feature_extraction_and_overlay(image, drone.frames[0], 0, image_array, drone)
 
-    mainImage = image_array[0]
-    ret, buffer = cv2.imencode('.jpg', mainImage)
-    if not ret:
-        emit('frame_error', 'Error encoding image')
-    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
-    emit('frame_response', jpg_as_text)
+        mainImage = image_array[0]
+        ret, buffer = cv2.imencode('.jpg', mainImage)
+        if not ret:
+            emit('frame_error', 'Error encoding image')
+        jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+        emit('frame_response', jpg_as_text)
 
 
 if __name__ == '__main__':
