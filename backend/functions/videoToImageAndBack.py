@@ -3,6 +3,7 @@ import cv2
 import os
 import numpy as np
 from moviepy.editor import VideoFileClip
+from functions.video_information import video_resolution_fix
 
 def remove_black_borders(image, border_size):
     height, width = image.shape[:2]
@@ -25,9 +26,7 @@ def convert_video_to_images(video):
         # Adding frames of random color
         frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=random_color)
 
-        new_width = int(frame.shape[1] * (2/3))
-        new_height = int(frame.shape[0] * (2/3))
-        frame = cv2.resize(frame, (new_width, new_height))
+        frame, _, _ = video_resolution_fix(frame)
         frames.append(frame)
     cam.release()
     os.remove(video_path)

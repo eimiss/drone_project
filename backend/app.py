@@ -12,9 +12,9 @@ from flask_socketio import SocketIO, emit
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from functions.videoToImageAndBack import convert_video_to_images, create_video, transcode_video
-from functions.feature_extraction_and_overlay import feature_extraction_and_overlay, feature_extraction_and_overlay_map
+from functions.feature_extraction_and_overlay import feature_extraction_and_overlay, feature_extraction_and_overlay_map, feature_extraction_and_overlay_live
 from functions.optical_flow import optical_flow, optical_flow_map
-from functions.video_information import get_videos_information
+from functions.video_information import get_videos_information, video_resolution_fix
 
 
 app = Flask(__name__)
@@ -93,9 +93,7 @@ def handle_upload():
     image_frame = np.frombuffer(image_bytes, dtype=np.uint8)
     image = cv2.imdecode(image_frame, cv2.IMREAD_COLOR)
 
-    new_width = int(image.shape[1] * (2/3))
-    new_height = int(image.shape[0] * (2/3))
-    image = cv2.resize(image, (new_width, new_height))
+    image, _, _ = video_resolution_fix(image)
 
     for drone in drones:
         size = len(drone.frames)
@@ -106,11 +104,19 @@ def handle_upload():
         image_array.append(image)
 
     for drone in drones:
+        skipping = False
         for i in range(len(drone.frames)):
             if drone.isWarped:
                 image_array, drone = optical_flow(image, drone.frames[i], drone, image_array, i)
             else:
-                image_array, drone = feature_extraction_and_overlay(image, drone.frames[i], i, image_array, drone)
+                if skipping:
+                    if i % 20 == 0:
+                        image_array[i] = image
+                        skipping = False
+                    else:
+                        image_array[i] = image
+                else:
+                    image_array, drone, skipping = feature_extraction_and_overlay(image, drone.frames[i], i, image_array, drone)
 
     now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_video_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], 'Temp.mp4')
@@ -194,9 +200,7 @@ def handle_upload_from_map():
         return jsonify({'message': 'No image resolution uploaded'}), 400
     
     base_image = cv2.imdecode(image_frame, cv2.IMREAD_COLOR)
-    new_width = int(base_image.shape[1])
-    new_height = int(base_image.shape[0])
-    base_image = cv2.resize(base_image, (new_width, new_height))
+    base_image, new_width, new_height = video_resolution_fix(base_image)
 
     image_resolution = json.loads(image_resolution)
     image_resolution_x = image_resolution['width']
@@ -226,11 +230,7 @@ def handle_upload_from_map():
         video_image_bytes = video_image.read()
         video_image_frame = np.frombuffer(video_image_bytes, dtype=np.uint8)
         video_image_decoded = cv2.imdecode(video_image_frame, cv2.IMREAD_COLOR)
-        
-        new_width = int(video_image_decoded.shape[1] * (2/3))
-        new_height = int(video_image_decoded.shape[0] * (2/3))
-
-        video_image = cv2.resize(video_image_decoded, (new_width, new_height))
+        video_image, _, _ = video_resolution_fix(video_image_decoded) 
         video_image_array.append(video_image)
 
 
@@ -318,10 +318,7 @@ def air_drone_image():
     image_frame = np.frombuffer(image_bytes, dtype=np.uint8)
     image_decoded = cv2.imdecode(image_frame, cv2.IMREAD_COLOR)
 
-    new_width = int(image_decoded.shape[1] * (2/3))
-    new_height = int(image_decoded.shape[0] * (2/3))
-
-    image = cv2.resize(image_decoded, (new_width, new_height))
+    image, _, _ = video_resolution_fix(image_decoded)
 
     image_for_live = image
     return jsonify({'message': 'Image uploaded successfully'})
@@ -408,9 +405,7 @@ def get_frames_live(rtsp_urls):
                     frame = get_frame_from_global(drone.rtsp)
                     if frame is not None:
                         frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=drone.frame_color)
-                        new_width = int(frame.shape[1] * (2/3))
-                        new_height = int(frame.shape[0] * (2/3))
-                        frame = cv2.resize(frame, (new_width, new_height))
+                        frame, _, _ = video_resolution_fix(frame)
 
                         drone.frames = [frame]
                         counter += 1
@@ -419,9 +414,7 @@ def get_frames_live(rtsp_urls):
                 if frame is not None:
                     random_color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
                     frame = cv2.copyMakeBorder(frame, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=random_color)
-                    new_width = int(frame.shape[1] * (2/3))
-                    new_height = int(frame.shape[0] * (2/3))
-                    frame = cv2.resize(frame, (new_width, new_height))
+                    frame, _, _ = video_resolution_fix(frame)
 
                     drone = drone_config([], 1, 0, [frame], None, False, None, rtsp_url, 0, False, random_color)
                     air_drones.append(drone)
@@ -438,7 +431,7 @@ def get_frames_live(rtsp_urls):
                         drone.isWarped = True
                 else:
                     print("Extracting features")
-                    image_array, drone = feature_extraction_and_overlay(image, drone.frames[0], 0, image_array, drone)
+                    image_array, drone = feature_extraction_and_overlay_live(image, drone.frames[0], 0, image_array, drone)
 
         mainImage = image_array[0]
         ret, buffer = cv2.imencode('.jpg', mainImage)

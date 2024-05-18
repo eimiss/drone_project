@@ -18,48 +18,54 @@ def make_background_transparent(image):
     # get external contour
     contours = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours[0] if len(contours) == 2 else contours[1]
-    big_contour = max(contours, key=cv2.contourArea)
-    # draw white filled contour on black background as mas
-    contour = np.zeros_like(gray)
-    cv2.drawContours(contour, [big_contour], 0, 255, -1)
+    if contours:
+        big_contour = max(contours, key=cv2.contourArea)
+        # draw white filled contour on black background as mas
+        contour = np.zeros_like(gray)
+        cv2.drawContours(contour, [big_contour], 0, 255, -1)
 
-    # blur dilate image
-    blur = cv2.GaussianBlur(contour, (5,5), sigmaX=0, sigmaY=0, borderType = cv2.BORDER_DEFAULT)
+        # blur dilate image
+        blur = cv2.GaussianBlur(contour, (5,5), sigmaX=0, sigmaY=0, borderType = cv2.BORDER_DEFAULT)
 
-    # stretch so that 255 -> 255 and 127.5 -> 0
-    mask = skimage.exposure.rescale_intensity(blur, in_range=(127.5,255), out_range=(0,255))
+        # stretch so that 255 -> 255 and 127.5 -> 0
+        mask = skimage.exposure.rescale_intensity(blur, in_range=(127.5,255), out_range=(0,255))
 
-    # put mask into alpha channel of input
-    result = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-    result[:,:,3] = mask
-    return result
+        # put mask into alpha channel of input
+        result = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+        result[:,:,3] = mask
+        return result, "done"
+    else:
+        return image, "failed"
 
 def making_image(base_image, rotated_optical_flow_image, average_difference, all_images, transformation_matrix, image_number):
     new_transformation_matrix = np.array([[1, 0, -average_difference[0]],
                                           [0, 1, -average_difference[1]],
                                           [0, 0, 1]])
     transform_matrix = np.dot(transformation_matrix, new_transformation_matrix)
+    
     warped_image = cv2.warpAffine(rotated_optical_flow_image, transform_matrix, (base_image.shape[1], base_image.shape[0]))
     # load image
-    transparent_image = make_background_transparent(warped_image)
+    transparent_image, text = make_background_transparent(warped_image)
+    if text == "failed":
+        all_images[image_number] = base_image
+    else:
+        # Extract the foreground and alpha channels
+        foreground_img = transparent_image[:, :, :3]
+        alpha_mask = transparent_image[:, :, 3]
 
-    # Extract the foreground and alpha channels
-    foreground_img = transparent_image[:, :, :3]
-    alpha_mask = transparent_image[:, :, 3]
+        # Create a mask for the transparent regions
+        inverse_alpha_mask = cv2.bitwise_not(alpha_mask)
 
-    # Create a mask for the transparent regions
-    inverse_alpha_mask = cv2.bitwise_not(alpha_mask)
+        # Create a masked foreground image
+        masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
 
-    # Create a masked foreground image
-    masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
+        # Create a masked background image
+        masked_background = cv2.bitwise_and(all_images[image_number], all_images[image_number], mask=inverse_alpha_mask)
 
-    # Create a masked background image
-    masked_background = cv2.bitwise_and(all_images[image_number], all_images[image_number], mask=inverse_alpha_mask)
+        # Overlay the masked foreground onto the masked background
+        overlayed_image = cv2.add(masked_foreground, masked_background)
 
-    # Overlay the masked foreground onto the masked background
-    overlayed_image = cv2.add(masked_foreground, masked_background)
-
-    all_images[image_number] = overlayed_image
+        all_images[image_number] = overlayed_image
 
 
 def optical_flow(base_image, overlay_image, drone, image_array, image_number):
@@ -75,13 +81,23 @@ def optical_flow(base_image, overlay_image, drone, image_array, image_number):
     current_image = overlay_image
     current_image = cv2.resize(current_image, (int(current_image.shape[1] * drone.coeff), int(current_image.shape[0] * drone.coeff)))
 
-    rotated_optical_flow_image = imutils.rotate_bound(current_image, -drone.rotation)
     # Compute optical flow
     next_pts, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray, current_gray, prev_pts, None)
 
     # Filter valid points
     valid_prev_pts = prev_pts[status == 1]
     valid_next_pts = next_pts[status == 1]
+
+    # Rotation
+    M, _ = cv2.estimateAffine2D(valid_prev_pts, valid_next_pts, False)
+    if M is not None:
+        angle = np.arctan2(M[0, 1], M[0, 0])
+        rotation = np.degrees(angle)
+        if 0.2 > rotation > -0.2:
+            rotation = 0
+        drone.rotation = drone.rotation - rotation
+        
+    rotated_optical_flow_image = imutils.rotate_bound(current_image, -drone.rotation)
 
     # Calculate displacement between points
     displacement = valid_next_pts - valid_prev_pts
@@ -119,7 +135,6 @@ def optical_flow_map(base_image, overlay_image, transf_matrix, prev_image, rotat
     # Convert current frame to grayscale
     current_gray = cv2.cvtColor(overlay_image, cv2.COLOR_BGR2GRAY)
     current_image = overlay_image
-    rotated_optical_flow_image = imutils.rotate_bound(current_image, -rotation)
 
     # Compute optical flow (Lucas-Kanade method)
     next_pts, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray, current_gray, prev_pts, None)
@@ -127,6 +142,17 @@ def optical_flow_map(base_image, overlay_image, transf_matrix, prev_image, rotat
     # Filter valid points
     valid_prev_pts = prev_pts[status == 1]
     valid_next_pts = next_pts[status == 1]
+
+    # Rotation
+    M, _ = cv2.estimateAffine2D(valid_prev_pts, valid_next_pts, False)
+    if M is not None:
+        angle = np.arctan2(M[0, 1], M[0, 0])
+        rotation_new = np.degrees(angle)
+        if 0.2 > rotation_new > -0.2:
+            rotation_new = 0
+        rotation = rotation - rotation_new
+        
+    rotated_optical_flow_image = imutils.rotate_bound(current_image, -rotation)
 
     # Calculate displacement between points
     displacement = valid_next_pts - valid_prev_pts

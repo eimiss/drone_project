@@ -5,7 +5,7 @@ import imutils
 import skimage.exposure
 import math
 
-MIN_MATCH_COUNT = 5
+MIN_MATCH_COUNT = 50
 
 def similar_features(base_image, overlay_image):
     #Greyscale images
@@ -25,7 +25,7 @@ def similar_features(base_image, overlay_image):
 
     good = []
     for m,n in matches:
-        if m.distance < 0.80*n.distance:
+        if m.distance < 0.70*n.distance:
             good.append(m)
     return good, kp1, kp2
 
@@ -161,8 +161,75 @@ def feature_extraction_and_overlay(base_image, overlay_image, image_number, imag
     source_points = []
     destination_points = []
     theta = 0
+    skipping = False
 
     good, kp1, kp2 = similar_features(base_image, overlay_image)
+    if len(good) < MIN_MATCH_COUNT:
+        skipping = True
+        image_array[image_number] = base_image
+
+        # Adding drone configs
+        drone.average_difference = [0, 0]
+        drone.coeff = 0
+        drone.rotation = 0
+        drone.transformation_matrix = 0
+        drone.isWarped = False
+        drone.prev_image = base_image
+        return image_array, drone, skipping
+    else:
+        img2_rotated, theta, source_points, destination_points = extracting_features(good, kp1,
+                kp2, overlay_image, source_points, destination_points)
+
+        rotated_points = rotate_points_main(overlay_image, img2_rotated, destination_points, theta)
+
+        square_size_source = square_size(source_points)
+        square_size_destination = square_size(rotated_points)
+
+        # Destination image resize
+        # To do after resizing square sizze need to recalculate second image points again
+        coeff = square_size_source / square_size_destination
+        img2_resized = cv2.resize(img2_rotated, (int(img2_rotated.shape[1] * coeff), int(img2_rotated.shape[0] * coeff)))
+
+        new_rotated_points = resize_points(rotated_points, coeff)
+        result_image, transformation_matrix = warp_image(img2_resized, base_image, new_rotated_points, source_points)
+
+        # load image
+        transparent_image = make_background_transparent(result_image)
+        # Extract the foreground and alpha channels
+        foreground_img = transparent_image[:, :, :3]
+        alpha_mask = transparent_image[:, :, 3]
+
+        # Create a mask for the transparent regions
+        inverse_alpha_mask = cv2.bitwise_not(alpha_mask)
+
+        # Create a masked foreground image
+        masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
+
+        # Create a masked background image
+        masked_background = cv2.bitwise_and(image_array[image_number], image_array[image_number], mask=inverse_alpha_mask)
+
+        # Overlay the masked foreground onto the masked background
+        overlayed_image = cv2.add(masked_foreground, masked_background)
+
+        image_array[image_number] = overlayed_image
+
+        # Adding drone configs
+        drone.average_difference = [0, 0]
+        drone.coeff = coeff
+        drone.rotation = theta
+        drone.transformation_matrix = transformation_matrix
+        drone.isWarped = True
+        drone.prev_image = overlay_image
+            
+        return image_array, drone, skipping
+
+def feature_extraction_and_overlay_live(base_image, overlay_image, image_number, image_array, drone):
+    source_points = []
+    destination_points = []
+    theta = 0
+
+    good, kp1, kp2 = similar_features(base_image, overlay_image)
+    
 
     img2_rotated, theta, source_points, destination_points = extracting_features(good, kp1,
             kp2, overlay_image, source_points, destination_points)

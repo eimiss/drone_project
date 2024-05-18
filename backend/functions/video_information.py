@@ -1,3 +1,4 @@
+import cv2
 from moviepy.editor import VideoFileClip
 from io import BytesIO
 from PIL import Image
@@ -6,6 +7,19 @@ import os
 import base64
 
 import numpy as np
+
+def video_resolution_fix(image):
+    #Put iamge shape into width and height
+    fixed_width = 1600
+    height, width, _ = image.shape
+    if width > fixed_width:
+        size_width_coeff = width / fixed_width
+        new_width = int(width / size_width_coeff)
+        new_height = int(height / size_width_coeff)
+        image = cv2.resize(image, (new_width, new_height))
+        return image, width, height
+    else:
+        return image, width, height
 
 
 def get_videos_information(path):
