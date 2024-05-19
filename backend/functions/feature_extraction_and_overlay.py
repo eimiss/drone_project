@@ -164,7 +164,7 @@ def feature_extraction_and_overlay(base_image, overlay_image, image_number, imag
     skipping = False
 
     good, kp1, kp2 = similar_features(base_image, overlay_image)
-    if len(good) < MIN_MATCH_COUNT:
+    if len(good) <= MIN_MATCH_COUNT:
         skipping = True
         image_array[image_number] = base_image
 

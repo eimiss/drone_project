@@ -107,12 +107,14 @@ def handle_upload():
         skipping = False
         for i in range(len(drone.frames)):
             if drone.isWarped:
+                print("running..." + str(i))
                 image_array, drone = optical_flow(image, drone.frames[i], drone, image_array, i)
             else:
                 if skipping:
                     if i % 20 == 0:
                         image_array[i] = image
                         skipping = False
+                        print("skipping..." + str(i))
                     else:
                         image_array[i] = image
                 else:
@@ -120,7 +122,7 @@ def handle_upload():
 
     now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_video_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], 'Temp.mp4')
-    print(output_video_path)
+    print("Creating video")
     create_video(image_array, output_video_path)
     output_video_path_new = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], f'{now}.mp4')
     transcode_video(output_video_path, output_video_path_new)
