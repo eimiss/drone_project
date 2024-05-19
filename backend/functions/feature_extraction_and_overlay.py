@@ -5,7 +5,7 @@ import imutils
 import skimage.exposure
 import math
 
-MIN_MATCH_COUNT = 50
+MIN_MATCH_COUNT = 60 # change to 60
 
 def similar_features(base_image, overlay_image):
     #Greyscale images
@@ -30,7 +30,7 @@ def similar_features(base_image, overlay_image):
     return good, kp1, kp2
 
 def extracting_features(good, kp1, kp2, overlay_image, source_points, destination_points):
-    if len(good)>MIN_MATCH_COUNT:
+    if len(good)>=MIN_MATCH_COUNT:
         src_pts = np.float32([ kp1[m.queryIdx].pt for m in good ]).reshape(-1,1,2)
         dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
         
@@ -164,7 +164,7 @@ def feature_extraction_and_overlay(base_image, overlay_image, image_number, imag
     skipping = False
 
     good, kp1, kp2 = similar_features(base_image, overlay_image)
-    if len(good) <= MIN_MATCH_COUNT:
+    if len(good) < MIN_MATCH_COUNT:
         skipping = True
         image_array[image_number] = base_image
 

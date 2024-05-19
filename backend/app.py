@@ -112,11 +112,10 @@ def handle_upload():
             else:
                 if skipping:
                     if i % 20 == 0:
-                        image_array[i] = image
                         skipping = False
-                        print("skipping..." + str(i))
+                        print("skipping done..." + str(i))
                     else:
-                        image_array[i] = image
+                        print("skipping..." + str(i))
                 else:
                     image_array, drone, skipping = feature_extraction_and_overlay(image, drone.frames[i], i, image_array, drone)
 
