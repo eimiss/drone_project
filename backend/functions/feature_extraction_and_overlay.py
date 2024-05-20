@@ -229,53 +229,56 @@ def feature_extraction_and_overlay_live(base_image, overlay_image, image_number,
     theta = 0
 
     good, kp1, kp2 = similar_features(base_image, overlay_image)
-    
+    if len(good) < MIN_MATCH_COUNT:
+        # Adding drone configs
+        drone.isWarped = False
+        return image_array, drone
+    else:
+        img2_rotated, theta, source_points, destination_points = extracting_features(good, kp1,
+                kp2, overlay_image, source_points, destination_points)
 
-    img2_rotated, theta, source_points, destination_points = extracting_features(good, kp1,
-            kp2, overlay_image, source_points, destination_points)
+        rotated_points = rotate_points_main(overlay_image, img2_rotated, destination_points, theta)
 
-    rotated_points = rotate_points_main(overlay_image, img2_rotated, destination_points, theta)
+        square_size_source = square_size(source_points)
+        square_size_destination = square_size(rotated_points)
 
-    square_size_source = square_size(source_points)
-    square_size_destination = square_size(rotated_points)
+        # Destination image resize
+        # To do after resizing square sizze need to recalculate second image points again
+        coeff = square_size_source / square_size_destination
+        img2_resized = cv2.resize(img2_rotated, (int(img2_rotated.shape[1] * coeff), int(img2_rotated.shape[0] * coeff)))
 
-    # Destination image resize
-    # To do after resizing square sizze need to recalculate second image points again
-    coeff = square_size_source / square_size_destination
-    img2_resized = cv2.resize(img2_rotated, (int(img2_rotated.shape[1] * coeff), int(img2_rotated.shape[0] * coeff)))
+        new_rotated_points = resize_points(rotated_points, coeff)
+        result_image, transformation_matrix = warp_image(img2_resized, base_image, new_rotated_points, source_points)
 
-    new_rotated_points = resize_points(rotated_points, coeff)
-    result_image, transformation_matrix = warp_image(img2_resized, base_image, new_rotated_points, source_points)
+        # load image
+        transparent_image = make_background_transparent(result_image)
+        # Extract the foreground and alpha channels
+        foreground_img = transparent_image[:, :, :3]
+        alpha_mask = transparent_image[:, :, 3]
 
-    # load image
-    transparent_image = make_background_transparent(result_image)
-    # Extract the foreground and alpha channels
-    foreground_img = transparent_image[:, :, :3]
-    alpha_mask = transparent_image[:, :, 3]
+        # Create a mask for the transparent regions
+        inverse_alpha_mask = cv2.bitwise_not(alpha_mask)
 
-    # Create a mask for the transparent regions
-    inverse_alpha_mask = cv2.bitwise_not(alpha_mask)
+        # Create a masked foreground image
+        masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
 
-    # Create a masked foreground image
-    masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
+        # Create a masked background image
+        masked_background = cv2.bitwise_and(image_array[image_number], image_array[image_number], mask=inverse_alpha_mask)
 
-    # Create a masked background image
-    masked_background = cv2.bitwise_and(image_array[image_number], image_array[image_number], mask=inverse_alpha_mask)
+        # Overlay the masked foreground onto the masked background
+        overlayed_image = cv2.add(masked_foreground, masked_background)
 
-    # Overlay the masked foreground onto the masked background
-    overlayed_image = cv2.add(masked_foreground, masked_background)
+        image_array[image_number] = overlayed_image
 
-    image_array[image_number] = overlayed_image
-
-    # Adding drone configs
-    drone.average_difference = [0, 0]
-    drone.coeff = coeff
-    drone.rotation = theta
-    drone.transformation_matrix = transformation_matrix
-    drone.isWarped = True
-    drone.prev_image = overlay_image
-        
-    return image_array, drone
+        # Adding drone configs
+        drone.average_difference = [0, 0]
+        drone.coeff = coeff
+        drone.rotation = theta
+        drone.transformation_matrix = transformation_matrix
+        drone.isWarped = True
+        drone.prev_image = overlay_image
+            
+        return image_array, drone
 
 def feature_extraction_and_overlay_map(base_image, base_image_points, overlay_image, overlay_image_points, image_array, image_number):
     result_image, transformation_matrix = warp_image(overlay_image, base_image, overlay_image_points, base_image_points)
