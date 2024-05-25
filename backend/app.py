@@ -103,21 +103,27 @@ def handle_upload():
     for _ in range(max_image_count):
         image_array.append(image)
 
+    drone_counter = 0
     for drone in drones:
+        drone_counter += 1
         skipping = False
         for i in range(len(drone.frames)):
             if drone.isWarped:
                 print("running..." + str(i))
-                image_array, drone = optical_flow(image, drone.frames[i], drone, image_array, i)
+                image_array, drone = optical_flow(image, drone.frames[i], drone, image_array, i, drone_counter)
             else:
                 if skipping:
-                    if i % 20 == 0:
+                    if i % 50 == 0:
+                        if drone_counter == 1:
+                            image_array[i] = cv2.GaussianBlur(image_array[i], (35, 35), 0)
                         skipping = False
                         print("skipping done..." + str(i))
                     else:
+                        if drone_counter == 1:
+                            image_array[i] = cv2.GaussianBlur(image_array[i], (35, 35), 0)
                         print("skipping..." + str(i))
                 else:
-                    image_array, drone, skipping = feature_extraction_and_overlay(image, drone.frames[i], i, image_array, drone)
+                    image_array, drone, skipping = feature_extraction_and_overlay(image, drone.frames[i], i, image_array, drone, drone_counter)
 
     now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_video_path = os.path.join(app.config['UPLOAD_FOLDER_VIDEO'], 'Temp.mp4')
@@ -421,10 +427,12 @@ def get_frames_live(rtsp_urls):
                     air_drones.append(drone)
 
         image_array = [image]
+        drone_counter = 0
         if image_array is not None:
             for drone in air_drones:
+                drone_counter += 1
                 if drone.isWarped:
-                    image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0)
+                    image_array, drone = optical_flow(image, drone.frames[0], drone, image_array, 0, drone_counter)
                     if drone.resync:
                         drone.isWarped = False
                         drone.resync = False

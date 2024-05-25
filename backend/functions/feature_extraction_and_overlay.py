@@ -157,7 +157,7 @@ def warp_image(destination_image, source_image, destination_points, source_point
 
     return warped_image, transformation_matrix
 
-def feature_extraction_and_overlay(base_image, overlay_image, image_number, image_array, drone):
+def feature_extraction_and_overlay(base_image, overlay_image, image_number, image_array, drone, drone_counter):
     source_points = []
     destination_points = []
     theta = 0
@@ -166,7 +166,8 @@ def feature_extraction_and_overlay(base_image, overlay_image, image_number, imag
     good, kp1, kp2 = similar_features(base_image, overlay_image)
     if len(good) < MIN_MATCH_COUNT:
         skipping = True
-        image_array[image_number] = base_image
+        if drone_counter == 1:
+            image_array[image_number] = cv2.GaussianBlur(image_array[image_number], (35, 35), 0)
 
         # Adding drone configs
         drone.average_difference = [0, 0]
@@ -204,7 +205,9 @@ def feature_extraction_and_overlay(base_image, overlay_image, image_number, imag
 
         # Create a masked foreground image
         masked_foreground = cv2.bitwise_and(foreground_img, foreground_img, mask=alpha_mask)
-
+        
+        if drone_counter == 1:
+            image_array[image_number] = cv2.GaussianBlur(image_array[image_number], (35, 35), 0)
         # Create a masked background image
         masked_background = cv2.bitwise_and(image_array[image_number], image_array[image_number], mask=inverse_alpha_mask)
 

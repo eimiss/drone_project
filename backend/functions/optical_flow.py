@@ -46,9 +46,7 @@ def making_image(base_image, rotated_optical_flow_image, average_difference, all
     warped_image = cv2.warpAffine(rotated_optical_flow_image, transform_matrix, (base_image.shape[1], base_image.shape[0]))
     # load image
     transparent_image, text = make_background_transparent(warped_image)
-    if text == "failed":
-        all_images[image_number] = base_image
-    else:
+    if text != "failed":
         # Extract the foreground and alpha channels
         foreground_img = transparent_image[:, :, :3]
         alpha_mask = transparent_image[:, :, 3]
@@ -68,7 +66,7 @@ def making_image(base_image, rotated_optical_flow_image, average_difference, all
         all_images[image_number] = overlayed_image
 
 
-def optical_flow(base_image, overlay_image, drone, image_array, image_number):
+def optical_flow(base_image, overlay_image, drone, image_array, image_number, drone_counter):
     prev_gray = cv2.cvtColor(drone.prev_image, cv2.COLOR_BGR2GRAY)
     prev_gray = cv2.resize(prev_gray, (int(prev_gray.shape[1] * drone.coeff), int(prev_gray.shape[0] * drone.coeff)))
     # Initialize previous points for optical flow
@@ -115,6 +113,10 @@ def optical_flow(base_image, overlay_image, drone, image_array, image_number):
     # Add rotated shift values to original coordinates
     drone.average_difference[0] = drone.average_difference[0] + shift_x_rotated
     drone.average_difference[1] = drone.average_difference[1] + shift_y_rotated
+
+    # Blur base image
+    if drone_counter == 1:
+        image_array[image_number] = cv2.GaussianBlur(image_array[image_number], (35, 35), 0)
 
     # Update previous points for the next iteration
     making_image(base_image, rotated_optical_flow_image, drone.average_difference, image_array, drone.transformation_matrix, image_number)
