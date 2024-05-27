@@ -5,7 +5,7 @@ import imutils
 import skimage.exposure
 import math
 
-MIN_MATCH_COUNT = 60 # change to 60
+MIN_MATCH_COUNT = 55 # change to 60
 
 def similar_features(base_image, overlay_image):
     #Greyscale images
